@@ -28,7 +28,7 @@ func (store *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 	}
 
 	q := New(tx)
-	err = fn(q)
+	err = fn(q) // callback function, defined in TransferTx
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
 			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
@@ -48,11 +48,11 @@ type TransferTxParams struct {
 
 // TransferTxResult is the result of the transfer transaction
 type TransferTxResult struct {
-	Transfer      Transfer `json:"transfer"`
-	FromAccountID Account  `json:"from_account"`
-	ToAccountID   Account  `json:"to_account"`
-	FromEntry     Entry    `json:"from_entry"`
-	ToEntry       Entry    `json:"to_entry"`
+	Transfer    Transfer `json:"transfer"`
+	FromAccount Account  `json:"from_account"`
+	ToAccount   Account  `json:"to_account"`
+	FromEntry   Entry    `json:"from_entry"`
+	ToEntry     Entry    `json:"to_entry"`
 }
 
 // TransferTx performs a money transfer from one account to the other
@@ -88,10 +88,37 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 			return err
 		}
 
-		// TODO: update accounts balance
+		if arg.FromAccountID < arg.ToAccountID {
+			result.FromAccount, result.ToAccount, err = addMoney(ctx, q, arg.FromAccountID, -arg.Amount, arg.ToAccountID, arg.Amount)
+		} else {
+			result.ToAccount, result.FromAccount, err = addMoney(ctx, q, arg.ToAccountID, arg.Amount, arg.FromAccountID, -arg.Amount)
+		}
 
 		return nil
 	})
 
 	return result, err
+}
+
+func addMoney(
+	ctx context.Context,
+	q *Queries,
+	accountID1 int64,
+	amount1 int64,
+	accountID2 int64,
+	amount2 int64,
+) (account1, account2 Account, err error) {
+	account1, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
+		ID:     accountID1,
+		Amount: amount1,
+	})
+	if err != nil {
+		return
+	}
+
+	account2, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
+		ID:     accountID2,
+		Amount: amount2,
+	})
+	return
 }
