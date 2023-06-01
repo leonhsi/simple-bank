@@ -33,8 +33,6 @@ func (server *Server) createAccount(ctx *gin.Context) {
 		return
 	}
 
-	println("create account hi\n")
-
 	ctx.JSON(http.StatusOK, account)
 }
 

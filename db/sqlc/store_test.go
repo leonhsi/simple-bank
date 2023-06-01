@@ -13,7 +13,7 @@ func TestTransferTx(t *testing.T) {
 
 	account1 := createRandomAccout(t)
 	account2 := createRandomAccout(t)
-	fmt.Println(">> before:", account1.Balance, account2.Balance)
+	// fmt.Println(">> before:", account1.Balance, account2.Balance)
 
 	// run n concurrent trasfer transactions
 	n := 5
@@ -87,7 +87,7 @@ func TestTransferTx(t *testing.T) {
 		require.Equal(t, toAccount.ID, account2.ID)
 
 		// check account balance
-		fmt.Println(">> tx :", fromAccount.Balance, toAccount.Balance)
+		// fmt.Println(">> tx :", fromAccount.Balance, toAccount.Balance)
 		lostMoney := fromAccount.Balance - account1.Balance
 		gainMoney := toAccount.Balance - account2.Balance
 		require.Equal(t, -lostMoney, gainMoney)
@@ -107,9 +107,54 @@ func TestTransferTx(t *testing.T) {
 	updatedAccount2, err := testQueries.GetAccount(context.Background(), account2.ID)
 	require.NoError(t, err)
 
-	fmt.Println(">> after:", updatedAccount1.Balance, updatedAccount2.Balance)
+	// fmt.Println(">> after:", updatedAccount1.Balance, updatedAccount2.Balance)
 	require.Equal(t, account1.Balance-int64(n)*amount, updatedAccount1.Balance)
 	require.Equal(t, account2.Balance+int64(n)*amount, updatedAccount2.Balance)
+}
+
+func TestTransferTxErr(t *testing.T) {
+	store := NewStore(testDB)
+
+	// run n concurrent trasfer transactions
+	n := 5
+	errs := make(chan error)
+	results := make(chan TransferTxResult)
+
+	for i := 0; i < n; i++ {
+		go func() {
+			result, err := store.TransferTx(context.Background(), TransferTxParams{
+				FromAccountID: -1,
+				ToAccountID:   -1,
+				Amount:        -1,
+			})
+
+			errs <- err
+			results <- result
+		}()
+	}
+
+	for i := 0; i < n; i++ {
+		err := <-errs
+		require.Error(t, err)
+	}
+
+	for i := 0; i < n; i++ {
+		go func() {
+			result, err := store.TransferTx(context.Background(), TransferTxParams{
+				FromAccountID: 1,
+				ToAccountID:   -1,
+				Amount:        0,
+			})
+
+			errs <- err
+			results <- result
+		}()
+	}
+
+	for i := 0; i < n; i++ {
+		err := <-errs
+		require.Error(t, err)
+	}
 }
 
 // transfer 5 accounts to another 5 accounts, then transfer back
@@ -119,7 +164,7 @@ func TestTransferTxDeadlock(t *testing.T) {
 
 	account1 := createRandomAccout(t)
 	account2 := createRandomAccout(t)
-	fmt.Println(">> before:", account1.Balance, account2.Balance)
+	// fmt.Println(">> before:", account1.Balance, account2.Balance)
 
 	// run n concurrent trasfer transactions
 	n := 10
@@ -159,7 +204,20 @@ func TestTransferTxDeadlock(t *testing.T) {
 	updatedAccount2, err := testQueries.GetAccount(context.Background(), account2.ID)
 	require.NoError(t, err)
 
-	fmt.Println(">> after:", updatedAccount1.Balance, updatedAccount2.Balance)
+	// fmt.Println(">> after:", updatedAccount1.Balance, updatedAccount2.Balance)
 	require.Equal(t, account1.Balance, updatedAccount1.Balance)
 	require.Equal(t, account2.Balance, updatedAccount2.Balance)
+}
+
+func TestAddMoney(t *testing.T) {
+	q := New(testDB)
+	q.AddAccountBalance(context.Background(), AddAccountBalanceParams{
+		ID:     0,
+		Amount: 0,
+	})
+	fmt.Println("hello")
+	account1, account2, err := addMoney(context.Background(), q, -1, -1, -1, -1)
+	require.Error(t, err)
+	require.Empty(t, account1)
+	require.Empty(t, account2)
 }

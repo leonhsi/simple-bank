@@ -68,3 +68,15 @@ func TestListEntries(t *testing.T) {
 		require.Equal(t, arg.AccountID, entry.AccountID)
 	}
 }
+
+func TestListEntriesErr(t *testing.T) {
+	arg := ListEntriesParams{
+		AccountID: 0,
+		Limit:     -1,
+		Offset:    5,
+	}
+
+	entries, err := testQueries.ListEntries(context.Background(), arg)
+	require.Error(t, err)
+	require.Empty(t, entries)
+}

@@ -77,3 +77,22 @@ func TestListTransfer(t *testing.T) {
 		require.Equal(t, transfer.ToAccountID, account2.ID)
 	}
 }
+
+func TestListTransferErr(t *testing.T) {
+	account1 := createRandomAccout(t)
+	account2 := createRandomAccout(t)
+
+	for i := 0; i < 10; i++ {
+		CreateRandomTransfer(t, account1, account2)
+	}
+
+	arg := ListTransfersParams{
+		FromAccountID: account1.ID,
+		ToAccountID:   account2.ID,
+		Limit:         -1,
+		Offset:        -1,
+	}
+	transfers, err := testQueries.ListTransfers(context.Background(), arg)
+	require.Error(t, err)
+	require.Empty(t, transfers)
+}
